@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "deck.c"
 
@@ -215,6 +216,37 @@ void find_legal_moves(State *state)
     }
 }
 
+void init_state(State *state)
+{
+    Card deck[52];
+    shuffle_init(deck);
+    for (Suit s = 0; s < 4; s++)
+    {
+        for (Rank r = A; r <= K; r++)
+        {
+            Card card = {s, r};
+            shuffle_insert(deck, card);
+        }
+    }
+
+    int deck_index = 0;
+    state->n_draw_cards = 52 - (N_STACKS * (N_STACKS + 1) / 2);
+    state->draw_position = -1;
+    for (int stack_id = 0; stack_id < N_STACKS; stack_id++)
+    {
+        state->stacks[stack_id].base = stack_id;
+        state->stacks[stack_id].length = stack_id + 1;
+        for (int i  = 0; i < stack_id + 1; i++)
+        {
+            state->stacks[stack_id].cards[i] = deck[deck_index++];
+        }
+    }
+    for (int i = 0; i < state->n_draw_cards; i++)
+    {
+        state->draw[i] = deck[deck_index++];
+    }
+}
+
 void print_state(State *state)
 {
     printf("draw: ");
@@ -278,57 +310,105 @@ void print_state(State *state)
     }
 }
 
+int is_solved(State *state)
+{
+    for (int i = 0; i < N_STACKS; i++)
+    {
+        Stack stack = state->stacks[i];
+        if (stack.length > 0)
+        {
+            if (stack.length < 13)
+            {
+                return 0;
+            }
+
+            if (stack.base != 12)
+            {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 State states[256];
 int current_state = 0;
 
 int main()
 {
-    Card deck[52];
-    shuffle_init(deck);
-    for (Suit s = 0; s < 4; s++)
-    {
-        for (Rank r = A; r <= K; r++)
-        {
-            Card card = {s, r};
-            shuffle_insert(deck, card);
-        }
-    }
+    int seed = time(0);
+    seed = 1701386713;
+    srand(seed);
+    printf("random seed: %d\n", seed);
 
     State *state = &states[0];
+    init_state(state);
 
-    int deck_index = 0;
-    state->n_draw_cards = 52 - (N_STACKS * (N_STACKS + 1) / 2);
-    state->draw_position = -1;
-    for (int stack_id = 0; stack_id < N_STACKS; stack_id++)
+    print_state(state);
+
+    int quit = 0;
+    int next_move = 0;
+    while (!quit)
     {
-        state->stacks[stack_id].base = stack_id;
-        state->stacks[stack_id].length = stack_id + 1;
-        for (int i  = 0; i < stack_id + 1; i++)
+        State *state = &states[current_state];
+
+        if (is_solved(state))
         {
-            state->stacks[stack_id].cards[i] = deck[deck_index++];
+            printf("solved\n");
+            exit(0);
         }
-    }
-    for (int i = 0; i < state->n_draw_cards; i++)
-    {
-        state->draw[i] = deck[deck_index++];
-    }
 
-    for (int i = 0; i < 10; i++)
-    {
-        print_state(state);
-        find_legal_moves(state);
-        print_legal_moves(state);
-        
-        if (n_legal_moves > 0)
+        if (current_state >= 30)
         {
-            printf("---------------------------------------------\n");
-            printf("\n");
-            play_move(state, &legal_moves[0]);
+            n_moves -= 1;
+            current_state -= 1;
+            next_move = move_sequence[n_moves] + 1;
         }
         else
         {
-            printf("no legal moves\n");
-            break;
+            find_legal_moves(state);
+
+            if (next_move < n_legal_moves)
+            {
+                // make move
+                move_sequence[n_moves] = next_move;
+                n_moves += 1;
+                current_state += 1;
+                states[current_state] = states[current_state - 1];
+                play_move(&states[current_state], &legal_moves[next_move]);
+                next_move = 0;
+            }
+            else
+            {
+                n_moves -= 1;
+                current_state -= 1;
+                next_move = move_sequence[n_moves] + 1;
+            }
+        }
+
+        if (n_moves < 0)
+        {
+            printf("unsolvable\n");
+            exit(0);
         }
     }
+
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     print_state(state);
+    //     find_legal_moves(state);
+    //     print_legal_moves(state);
+        
+    //     if (n_legal_moves > 0)
+    //     {
+    //         printf("---------------------------------------------\n");
+    //         printf("\n");
+    //         play_move(state, &legal_moves[0]);
+    //     }
+    //     else
+    //     {
+    //         printf("no legal moves\n");
+    //         break;
+    //     }
+    // }
 }
