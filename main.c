@@ -109,6 +109,9 @@ int can_place_card(Card card, Stack *stack)
 Move legal_moves[256];
 int n_legal_moves = 0;
 
+int move_sequence[256];
+int n_moves = 0;
+
 void print_legal_moves(State *state)
 {
     for (int i = 0; i < n_legal_moves; i++)    
@@ -275,7 +278,8 @@ void print_state(State *state)
     }
 }
 
-State state;
+State states[256];
+int current_state = 0;
 
 int main()
 {
@@ -290,34 +294,36 @@ int main()
         }
     }
 
+    State *state = &states[0];
+
     int deck_index = 0;
-    state.n_draw_cards = 52 - (N_STACKS * (N_STACKS + 1) / 2);
-    state.draw_position = -1;
+    state->n_draw_cards = 52 - (N_STACKS * (N_STACKS + 1) / 2);
+    state->draw_position = -1;
     for (int stack_id = 0; stack_id < N_STACKS; stack_id++)
     {
-        state.stacks[stack_id].base = stack_id;
-        state.stacks[stack_id].length = stack_id + 1;
+        state->stacks[stack_id].base = stack_id;
+        state->stacks[stack_id].length = stack_id + 1;
         for (int i  = 0; i < stack_id + 1; i++)
         {
-            state.stacks[stack_id].cards[i] = deck[deck_index++];
+            state->stacks[stack_id].cards[i] = deck[deck_index++];
         }
     }
-    for (int i = 0; i < state.n_draw_cards; i++)
+    for (int i = 0; i < state->n_draw_cards; i++)
     {
-        state.draw[i] = deck[deck_index++];
+        state->draw[i] = deck[deck_index++];
     }
 
     for (int i = 0; i < 10; i++)
     {
-        print_state(&state);
-        find_legal_moves(&state);
-        print_legal_moves(&state);
+        print_state(state);
+        find_legal_moves(state);
+        print_legal_moves(state);
         
         if (n_legal_moves > 0)
         {
             printf("---------------------------------------------\n");
             printf("\n");
-            play_move(&state, &legal_moves[0]);
+            play_move(state, &legal_moves[0]);
         }
         else
         {
