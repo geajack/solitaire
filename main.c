@@ -114,10 +114,15 @@ int n_legal_moves = 0;
 int move_sequence[256];
 int n_moves = 0;
 
-void print_legal_moves(State *state)
+void print_legal_moves(State *state, int choice)
 {
     for (int i = 0; i < n_legal_moves; i++)    
     {
+        if (i == choice)
+        {
+            printf("! ");
+        }
+
         Move move = legal_moves[i];
         if (move.type == RESET_DRAW)
         {
@@ -400,11 +405,16 @@ int main()
             current_state -= 1;
             next_move = move_sequence[n_moves] + 1;
 
+            int i = 0;
+            find_legal_moves(&states[i]);
+            print_legal_moves(&states[i], move_sequence[i]);
             for (int i = 1; i < n_moves + 1; i++)
             {
                 printf("--------------------------------\n");
                 printf("\n");
                 print_state(&states[i]);
+                find_legal_moves(&states[i]);
+                print_legal_moves(&states[i], move_sequence[i]);
             }
             exit(1);
         }
