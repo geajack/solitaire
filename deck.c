@@ -19,7 +19,7 @@ const char *SUITS[4] = {
 };
 
 const char *RANKS[K + 1] = {
-    [A] = "1",
+    [A] = "A",
     [2] = "2",
     [3] = "3",
     [4] = "4",

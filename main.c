@@ -253,14 +253,18 @@ void print_state(State *state)
     printf("draw: ");
 
     int cycle_offset = 0;
+    int caret_position = 0;
+    int caret = 0;
     int draw_position = state->draw_position;
     for (int i = 0; i < state->n_draw_cards; i++)
     {
         Card card = state->draw[i];
         print_card(card);
+        caret_position += 2;
 
         if (i == draw_position)
         {
+            caret = caret_position - 2;
             cycle_offset = draw_position % 3;
             for (int j = 0; j < cycle_offset; j++)
             {
@@ -271,13 +275,20 @@ void print_state(State *state)
         if ((i + cycle_offset) % 3 == 2 && i != state->n_draw_cards - 1)
         {
             printf("|");
+            caret_position += 1;
         }
     }
     printf("\n");
-    if (state->draw_position >= 0)
+    if (draw_position >= 0)
     {
-        printf("draw position: %d\n", state->draw_position);
+        printf("       ");
+        for (int i = 0; i < caret; i++)
+        {
+            printf(" ");
+        }
+        printf("^");
     }
+    printf("\n");
 
     int row = 0;
     int are_cards = 1;
@@ -359,32 +370,43 @@ int main()
             exit(0);
         }
 
+        int stuck = 0;
         if (current_state >= 30)
         {
-            n_moves -= 1;
-            current_state -= 1;
-            next_move = move_sequence[n_moves] + 1;
+            stuck = 1;
         }
         else
         {
             find_legal_moves(state);
 
-            if (next_move < n_legal_moves)
+            if (next_move >= n_legal_moves)
             {
-                // make move
-                move_sequence[n_moves] = next_move;
-                n_moves += 1;
-                current_state += 1;
-                states[current_state] = states[current_state - 1];
-                play_move(&states[current_state], &legal_moves[next_move]);
-                next_move = 0;
+                stuck = 1;
             }
-            else
+        }
+
+        if (!stuck)
+        {
+            move_sequence[n_moves] = next_move;
+            n_moves += 1;
+            current_state += 1;
+            states[current_state] = states[current_state - 1];
+            play_move(&states[current_state], &legal_moves[next_move]);
+            next_move = 0;
+        }
+        else
+        {
+            n_moves -= 1;
+            current_state -= 1;
+            next_move = move_sequence[n_moves] + 1;
+
+            for (int i = 1; i < n_moves + 1; i++)
             {
-                n_moves -= 1;
-                current_state -= 1;
-                next_move = move_sequence[n_moves] + 1;
+                printf("--------------------------------\n");
+                printf("\n");
+                print_state(&states[i]);
             }
+            exit(1);
         }
 
         if (n_moves < 0)
