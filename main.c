@@ -20,7 +20,8 @@ struct State
     Stack stacks[N_STACKS];
     Card draw[52 - (N_STACKS * (N_STACKS + 1) / 2)];
     int n_draw_cards;
-    int draw_position;
+    int talon_base;
+    int talon_length;
 };
 typedef struct State State;
 
@@ -52,12 +53,15 @@ void play_move(State *state, Move *move)
         state->stacks[move->to_stack].cards[to_index] = moving;
         state->stacks[move->to_stack].length += 1;
 
-        int new_draw_position = index - 1;
-        if (new_draw_position % 3 == 2)
+        if (index == state->talon_base + state->talon_length - 1 && state->talon_length > 0)
         {
-            new_draw_position = -1;
+            state->talon_length -= 1;
         }
-        state->draw_position = new_draw_position;
+        else
+        {
+            state->talon_base = index - 2;
+            state->talon_length = 2;
+        }
 
         state->n_draw_cards -= 1;
     }
@@ -77,7 +81,7 @@ void play_move(State *state, Move *move)
     }
     else if (move->type == RESET_DRAW)
     {
-        state->draw_position = -1;
+        state->talon_length = 0;
     }
 }
 
@@ -155,6 +159,35 @@ void print_legal_moves(State *state, int choice)
     }
 }
 
+void find_legal_moves_for_card(State *state, Card card, int move_type, int from_position)
+{
+    for (int to_stack = 0; to_stack < N_STACKS; to_stack++)
+    {
+        if (to_stack == from_position)
+        {
+            continue;
+        }
+
+        int can = can_place_card(card, &state->stacks[to_stack]);
+        if (can)
+        {
+            legal_moves[n_legal_moves].type = move_type;
+            
+            if (move_type == FROM_STACK)
+            {
+                legal_moves[n_legal_moves].from_stack = from_position;            
+            }
+            else
+            {
+                legal_moves[n_legal_moves].from_draw = from_position;
+            }
+            
+            legal_moves[n_legal_moves].to_stack = to_stack;
+            n_legal_moves += 1;
+        }
+    }
+}
+
 void find_legal_moves(State *state)
 {
     n_legal_moves = 0;
@@ -166,58 +199,43 @@ void find_legal_moves(State *state)
         }
 
         Card moving = state->stacks[from_stack].cards[state->stacks[from_stack].base];
-        for (int to_stack = 0; to_stack < N_STACKS; to_stack++)
-        {
-            if (to_stack == from_stack)
-            {
-                continue;
-            }
-
-            int can = can_place_card(moving, &state->stacks[to_stack]);
-            if (can)
-            {
-                legal_moves[n_legal_moves].type = FROM_STACK;
-                legal_moves[n_legal_moves].from_stack = from_stack;
-                legal_moves[n_legal_moves].to_stack = to_stack;
-                n_legal_moves += 1;
-            }
-        }
+        find_legal_moves_for_card(state, moving, FROM_STACK, from_stack);
     }
 
-    int cycle_offset = 0;
-    int draw_position = state->draw_position;
-    if (draw_position == -1)
+    int have_talon = state->talon_length > 0;
+    
+    int before_talon = state->n_draw_cards;
+    if (have_talon)
     {
-        draw_position = 0;
+        int before_talon = state->talon_base - 1;    
+    }
+    
+    for (int i = 0; i < before_talon; i++)
+    {
+        if (i % 3 == 2)
+        {
+            // legal
+            find_legal_moves_for_card(state, state->draw[i], FROM_DRAW, i);
+        }
     }
 
-    for (int i = draw_position; i < state->n_draw_cards; i++)
+    if (have_talon)
     {
-        Card card = state->draw[i];
+        int talon_tip = state->talon_base + state->talon_length - 1;
+        // legal
+        find_legal_moves_for_card(state, state->draw[talon_tip], FROM_DRAW, talon_tip);
 
-        if (i == draw_position)
+        for (int i = talon_tip + 1; i < state->n_draw_cards; i++)
         {
-            cycle_offset = draw_position % 3;
-        }
-        
-        if ((i + cycle_offset) % 3 == 2 || i == state->n_draw_cards - 1)
-        {
-            Card moving = state->draw[i];
-            for (int to_stack = 0; to_stack < N_STACKS; to_stack++)
+            if ((i - (talon_tip + 1)) % 3 == 2)
             {
-                int can = can_place_card(moving, &state->stacks[to_stack]);
-                if (can)
-                {
-                    legal_moves[n_legal_moves].type = FROM_DRAW;
-                    legal_moves[n_legal_moves].from_draw = i;
-                    legal_moves[n_legal_moves].to_stack = to_stack;
-                    n_legal_moves += 1;
-                }
+                // legal
+                find_legal_moves_for_card(state, state->draw[i], FROM_DRAW, i);
             }
         }
     }
 
-    if (state->draw_position >= 0)
+    if (have_talon)
     {
         legal_moves[n_legal_moves].type = RESET_DRAW;
         n_legal_moves += 1;
@@ -239,7 +257,10 @@ void init_state(State *state)
 
     int deck_index = 0;
     state->n_draw_cards = 52 - (N_STACKS * (N_STACKS + 1) / 2);
-    state->draw_position = -1;
+    
+    state->talon_base = 0;
+    state->talon_length = 0;
+
     for (int stack_id = 0; stack_id < N_STACKS; stack_id++)
     {
         state->stacks[stack_id].base = stack_id;
@@ -262,17 +283,27 @@ void print_state(State *state)
     int cycle_offset = 0;
     int caret_position = 0;
     int caret = 0;
-    int draw_position = state->draw_position;
+    
     for (int i = 0; i < state->n_draw_cards; i++)
     {
         Card card = state->draw[i];
         print_card(card);
         caret_position += 2;
 
-        if (i == draw_position)
+        if (i == state->talon_base - 1 && state->talon_length > 0)
+        {
+            cycle_offset = state->talon_base % 3;
+            for (int j = 0; j < cycle_offset; j++)
+            {
+                printf("  ");
+                caret_position += 2;
+            }
+        }
+
+        if (i == state->talon_base + state->talon_length - 1 && state->talon_length > 0)
         {
             caret = caret_position - 2;
-            cycle_offset = draw_position % 3;
+            cycle_offset = (state->talon_base + state->talon_length - 1) % 3;
             for (int j = 0; j < cycle_offset; j++)
             {
                 printf("  ");
@@ -286,7 +317,7 @@ void print_state(State *state)
         }
     }
     printf("\n");
-    if (draw_position >= 0)
+    if (state->talon_length > 0)
     {
         printf("       ");
         for (int i = 0; i < caret; i++)
@@ -341,7 +372,7 @@ int is_solved(State *state)
                 return 0;
             }
 
-            if (stack.base != 12)
+            if (stack.base != 0)
             {
                 return 0;
             }
@@ -356,7 +387,6 @@ int current_state = 0;
 int main()
 {
     int seed = time(0);
-    seed = 1701436826;
     srand(seed);
     printf("random seed: %d\n", seed);
 
@@ -407,18 +437,18 @@ int main()
             current_state -= 1;
             next_move = move_sequence[n_moves] + 1;
 
-            int i = 0;
-            find_legal_moves(&states[i]);
-            print_legal_moves(&states[i], move_sequence[i]);
-            for (int i = 1; i < n_moves + 1; i++)
-            {
-                printf("--------------------------------\n");
-                printf("\n");
-                print_state(&states[i]);
-                find_legal_moves(&states[i]);
-                print_legal_moves(&states[i], move_sequence[i]);
-            }
-            exit(1);
+            // int i = 0;
+            // find_legal_moves(&states[i]);
+            // print_legal_moves(&states[i], move_sequence[i]);
+            // for (int i = 1; i < n_moves + 1; i++)
+            // {
+            //     printf("--------------------------------\n");
+            //     printf("\n");
+            //     print_state(&states[i]);
+            //     find_legal_moves(&states[i]);
+            //     print_legal_moves(&states[i], move_sequence[i]);
+            // }
+            // exit(1);
         }
 
         if (n_moves < 0)
