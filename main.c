@@ -72,6 +72,8 @@ void play_move(State *state, Move *move)
         }
         from_stack->length = from_stack->base;
         from_stack->base = from_stack->length - 1;
+        if (from_stack->base < 0)
+            from_stack->base = 0;
     }
     else if (move->type == RESET_DRAW)
     {
@@ -354,7 +356,7 @@ int current_state = 0;
 int main()
 {
     int seed = time(0);
-    seed = 1701386713;
+    seed = 1701436826;
     srand(seed);
     printf("random seed: %d\n", seed);
 
