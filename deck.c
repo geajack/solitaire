@@ -40,9 +40,10 @@ int COLOR(Card card)
 }
 
 
-int print_card(Card card)
+void print_card(Card card)
 {
-    if (card.suit == HEARTS || card.suit == DIAMONDS)
+    int is_terminal = isatty(1);
+    if (is_terminal & (card.suit == HEARTS || card.suit == DIAMONDS))
     {
         printf("\033[1;31m%s\033[1;39m%s", SUITS[card.suit], RANKS[card.rank]);
     }
